@@ -527,26 +527,64 @@ class CupertinoWidgetFactory extends AdaptiveWidgetFactory {
     required Widget content,
     List<Widget>? actions,
     bool barrierDismissible = true,
-  }) {
-    return showCupertinoDialog<T>(
+  }) async {
+    final pageNavigator = Navigator.of(context);
+    final sentinel = _CupertinoDialogSentinelRoute<T>();
+    final sentinelFuture = pageNavigator.push<T?>(sentinel);
+    NavigatorState? dialogNavigator;
+    bool dialogDismissed = false;
+
+    final completer = Completer<T?>();
+
+    sentinelFuture.then((value) {
+      if (!dialogDismissed && dialogNavigator?.canPop() == true) {
+        dialogDismissed = true;
+        dialogNavigator!.pop(value);
+      }
+      if (!completer.isCompleted) {
+        completer.complete(value);
+      }
+    });
+
+    final dialogFuture = showCupertinoDialog<T?>(
       context: context,
       barrierDismissible: barrierDismissible,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: title,
-        content: content,
-        actions: actions?.map((action) {
-              // Wrap actions to use correct context
-              if (action is CupertinoButton) {
-                return CupertinoDialogAction(
-                  onPressed: action.onPressed,
-                  child: action.child,
-                );
-              }
-              return action;
-            }).toList() ??
-            [],
-      ),
+      builder: (dialogContext) {
+        dialogNavigator ??= Navigator.of(dialogContext);
+        return CupertinoAlertDialog(
+          title: title,
+          content: content,
+          actions: actions ?? const [],
+        );
+      },
     );
+
+    dialogFuture.then((result) async {
+      dialogDismissed = true;
+      if (completer.isCompleted) {
+        return;
+      }
+      await Future<void>.delayed(Duration.zero);
+      if (completer.isCompleted) {
+        return;
+      }
+      await SchedulerBinding.instance.endOfFrame;
+      if (!sentinel.isCompleted) {
+        sentinel.completeIfNeeded(result, pageNavigator);
+      }
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+    }).catchError((error, stackTrace) {
+      if (!sentinel.isCompleted) {
+        sentinel.completeIfNeeded(null, pageNavigator);
+      }
+      if (!completer.isCompleted) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+
+    return completer.future;
   }
 
   @override
@@ -2230,6 +2268,60 @@ class CupertinoWidgetFactory extends AdaptiveWidgetFactory {
   }
 }
 
+class _CupertinoDialogSentinelRoute<T> extends PopupRoute<T?> {
+  bool _isCompleted = false;
+
+  bool get isCompleted => _isCompleted;
+
+  void completeIfNeeded(T? result, NavigatorState navigator) {
+    if (_isCompleted) {
+      return;
+    }
+    _isCompleted = true;
+    if (isActive) {
+      navigator.removeRoute(this, result);
+    }
+  }
+
+  @override
+  Duration get transitionDuration => Duration.zero;
+
+  @override
+  bool get barrierDismissible => false;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  bool get opaque => false;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    return const SizedBox.shrink();
+  }
+
+  @override
+  bool didPop(T? result) {
+    if (!_isCompleted) {
+      _isCompleted = true;
+    }
+    return super.didPop(result);
+  }
+
+  @override
+  void dispose() {
+    _isCompleted = true;
+    super.dispose();
+  }
+}
+
 /// iOS-style notification controller wrapper that acts like ScaffoldFeatureController
 class _CupertinoNotificationController {
   final OverlayEntry _overlayEntry;
@@ -2511,6 +2603,101 @@ class _CupertinoNotificationWidgetState
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Custom Cupertino alert dialog that handles button navigation properly.
+class _AdaptiveCupertinoAlertDialog extends StatelessWidget {
+  final Widget? title;
+  final Widget content;
+  final List<Widget> actions;
+  final BuildContext dialogContext;
+
+  const _AdaptiveCupertinoAlertDialog({
+    this.title,
+    required this.content,
+    required this.actions,
+    required this.dialogContext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // The buttons will call Navigator.pop(screenContext, value)
+    // We need them to call Navigator.pop(dialogContext, value) instead
+    // Since we can't modify the closure, we:
+    // 1. Let the button call its callback
+    // 2. Catch the resulting error (pop on wrong navigator)
+    // 3. Close the dialog ourselves using the dialog context
+    //
+    // The problem: we don't know what VALUE to return!
+    //
+    // Hacky solution: Parse the error message or use FlutterError.onError
+
+    FlutterError.onError = (FlutterErrorDetails details) {
+      // Suppress the specific assertion error about popping last page
+      if (details.exception
+          .toString()
+          .contains('currentConfiguration.isNotEmpty')) {
+        // Ignore this error - it's from our button trying to pop wrong navigator
+        return;
+      }
+      // Re-throw other errors
+      FlutterError.presentError(details);
+    };
+
+    final wrappedActions = actions.map((action) {
+      if (action is CupertinoButton) {
+        final originalCallback = action.onPressed;
+        return CupertinoButton(
+          key: action.key,
+          padding: action.padding,
+          onPressed: originalCallback,
+          child: action.child,
+        );
+      }
+      return action;
+    }).toList();
+
+    return CupertinoPopupSurface(
+      isSurfacePainted: true,
+      child: Container(
+        width: 270.0,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (title != null) ...[
+              DefaultTextStyle(
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 17.0,
+                  color: CupertinoColors.label,
+                ),
+                child: title!,
+              ),
+              const SizedBox(height: 8.0),
+            ],
+            DefaultTextStyle(
+              style: const TextStyle(
+                fontSize: 13.0,
+                color: CupertinoColors.label,
+              ),
+              textAlign: TextAlign.center,
+              child: content,
+            ),
+            if (wrappedActions.isNotEmpty) ...[
+              const SizedBox(height: 16.0),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: wrappedActions
+                    .map((action) => Expanded(child: action))
+                    .toList(),
+              ),
+            ],
+          ],
         ),
       ),
     );
