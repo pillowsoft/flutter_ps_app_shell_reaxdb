@@ -246,6 +246,7 @@ final confirmed = await ui.showConfirmationDialog(
 - **Page Modal**: CupertinoPageScaffold with navigation bar
 - **Action Sheet**: CupertinoActionSheet
 - **Confirmation**: CupertinoAlertDialog (narrow width for simple alerts)
+  - ✅ **Fixed:** Confirmation buttons now dismiss the dialog automatically even when callbacks pop using a page-level `BuildContext` (no more double-pop assertions with GoRouter).
 
 ### ForUI (Custom Design System)
 - **Form Dialog**: Flat design with 4px border radius
