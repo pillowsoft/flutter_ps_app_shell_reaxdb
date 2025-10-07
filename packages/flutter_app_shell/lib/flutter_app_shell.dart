@@ -28,9 +28,6 @@ export 'src/models/document.dart';
 // Utility exports
 export 'src/utils/logger.dart';
 
-// Debug/Testing screens (only export in debug builds)
-export 'src/screens/datalog_investigation_screen.dart';
-
 // UI component exports
 export 'src/ui/components/action_button.dart';
 export 'src/ui/components/dark_mode_toggle_button.dart';
