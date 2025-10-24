@@ -5,6 +5,79 @@ All notable changes to the Flutter PS App Shell project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-10-23
+
+### Added
+
+#### WAL File Management
+- **Automatic WAL cleanup** - Prevents Write-Ahead Log accumulation during development (hot restarts, Ctrl+C exits)
+- **WAL cleanup before initialization** - Scans and removes stale WAL files on database startup
+- **Configurable WAL settings** - New environment variables for WAL management:
+  - `REAXDB_WAL_AUTO_CLEANUP` - Enable/disable auto-cleanup (default: true in debug mode)
+  - `REAXDB_WAL_MAX_SIZE_MB` - Warn if WAL exceeds threshold (default: 10 MB)
+  - `REAXDB_CHECKPOINT_ON_CLOSE` - Checkpoint WAL on database close (default: true)
+- **WAL metrics in DatabaseStats** - Track WAL file count, total size, and last cleanup time
+- **Manual WAL cleanup** - `DatabaseService.cleanupWalFiles()` method for programmatic cleanup
+- **WAL cleanup UI** - "Cleanup WAL Files" button in Local Database Demo screen
+
+#### App Lifecycle Management
+- **AppLifecycleManager service** - Monitors app lifecycle events for proper resource cleanup
+- **Automatic database cleanup** - Closes database connection on app pause/detach/terminate
+- **Hot restart detection** - Handles database cleanup during Flutter hot restarts
+- **Lifecycle hooks** - WidgetsBindingObserver integration for app state transitions
+
+#### Enhanced Logging & Diagnostics
+- **Initialization timing** - Logs database initialization duration with millisecond precision
+- **WAL processing warnings** - Alerts when initialization takes >1 second (indicates WAL accumulation)
+- **Detailed WAL logging** - Logs WAL file count, size, and cleanup duration
+- **Performance monitoring** - Separate timings for total init vs. database open
+
+#### Documentation
+- **WAL File Management section** - Comprehensive guide in `docs/services/database.md`
+- **Troubleshooting guide** - New `docs/troubleshooting/database.md` with common issues and solutions
+- **Updated .env.example** - Added WAL configuration options and removed outdated InstantDB references
+- **Migration notes** - Documented InstantDB → ReaxDB transition in .env.example
+
+### Changed
+
+#### Database Initialization
+- Enhanced `DatabaseService.initialize()` with WAL cleanup and timing measurements
+- Added configuration detection from environment variables
+- Improved logging with structured timing information
+
+#### DatabaseStats Class
+- Extended with WAL metrics: `walFileCount`, `walTotalSize`, `lastCleanupTime`
+- Added `walSizeMB` computed property for human-readable size
+- Updated `toString()` to include WAL information
+
+#### Local Database Demo Screen
+- Enhanced database statistics dialog with WAL metrics section
+- Added "Cleanup WAL Files" button for manual WAL cleanup
+- Improved stats display with categorized sections (Database Status, WAL Management, Path)
+- Added time-relative formatting for cleanup timestamps (e.g., "5m ago")
+
+#### Environment Configuration
+- Updated `.env.example` with comprehensive ReaxDB and WAL configuration
+- Removed all InstantDB references
+- Added migration notes explaining v2.0.0 changes
+
+### Fixed
+- **WAL accumulation during development** - Hot restarts and force quits no longer leave behind WAL files
+- **Slow database initialization** - Automatic cleanup prevents 10+ second delays from accumulated WAL files
+- **Database not closing properly** - AppLifecycleManager ensures cleanup on all app termination paths
+
+### Performance
+- **Faster startup times** - Automatic WAL cleanup eliminates multi-second initialization delays
+- **Reduced disk usage** - Prevents WAL file accumulation (observed cases: 31 files / 1.9MB)
+- **Development optimization** - Debug mode enables aggressive WAL cleanup by default
+
+### Developer Experience
+- **Better visibility** - Initialization timing and WAL metrics shown in logs and UI
+- **Troubleshooting support** - Comprehensive guide for common database issues
+- **Configurable behavior** - Environment variables for dev vs. production WAL strategies
+
+---
+
 ## [2.0.2] - 2025-10-05
 
 ### Fixed

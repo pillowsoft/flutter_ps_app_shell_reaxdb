@@ -11,6 +11,7 @@ import 'authentication_service.dart';
 import 'logging_service.dart';
 import 'cloudflare_service.dart';
 import 'window_state_service.dart';
+import 'app_lifecycle_manager.dart';
 import '../utils/logger.dart';
 
 final GetIt getIt = GetIt.instance;
@@ -31,6 +32,16 @@ Future<void> setupLocator() async {
   logger.info('Setting up service locator...');
 
   // Core Services
+
+  // Register AppLifecycleManager (should be early for cleanup hooks)
+  if (!getIt.isRegistered<AppLifecycleManager>()) {
+    final lifecycleManager = AppLifecycleManager.instance;
+    lifecycleManager.initialize();
+    getIt.registerSingleton<AppLifecycleManager>(lifecycleManager);
+    logger.info('Registered AppLifecycleManager');
+  } else {
+    logger.info('AppLifecycleManager already registered, skipping');
+  }
 
   // Register NavigationService
   if (!getIt.isRegistered<NavigationService>()) {

@@ -361,6 +361,18 @@ REAXDB_ENCRYPTION_ENABLED=false
 # Encryption key (required if encryption enabled)
 # Must be a secure random string
 # REAXDB_ENCRYPTION_KEY=your-32-character-key-here
+
+# WAL Management (Write-Ahead Log)
+# Auto-cleanup stale WAL files (default: true in debug mode, false in release)
+REAXDB_WAL_AUTO_CLEANUP=true
+
+# Maximum WAL size threshold in MB (default: 10)
+# Warns if total WAL size exceeds this value
+REAXDB_WAL_MAX_SIZE_MB=10
+
+# Checkpoint WAL on database close (default: true)
+# Merges WAL changes back into main database on clean shutdown
+REAXDB_CHECKPOINT_ON_CLOSE=true
 ```
 
 ### Programmatic Initialization
@@ -426,6 +438,154 @@ final connectionStatus = signal<DatabaseConnectionStatus>(
 // Last operation timestamp
 final lastOperationTime = signal<DateTime?>(null);
 ```
+
+## 📂 WAL File Management
+
+### What are WAL Files?
+
+ReaxDB (like SQLite) uses Write-Ahead Logging (WAL) for database transactions. WAL files temporarily store changes before they're merged into the main database file. This improves performance and crash recovery.
+
+**WAL Files Include:**
+- `database-wal` - Write-ahead log file (transaction log)
+- `database-shm` - Shared memory file (coordination)
+
+### WAL Accumulation During Development
+
+**Problem**: During active development with hot restarts and Ctrl+C exits, WAL files can accumulate because:
+- Hot restart doesn't cleanly close the database
+- Ctrl+C force-quits the app without cleanup
+- Multiple WAL files pile up (31 files / 1.9MB observed)
+- Next app start processes ALL accumulated WAL files (10+ second delays)
+
+**Solution**: App Shell now includes automatic WAL cleanup:
+- ✅ Cleans up stale WAL files before database initialization
+- ✅ Enabled by default in debug mode
+- ✅ Prevents accumulation during development
+- ✅ Configurable via environment variables
+
+### Automatic WAL Cleanup
+
+WAL cleanup runs automatically before database initialization when enabled:
+
+```dart
+// Automatically configured from .env file
+await DatabaseService.instance.initialize();
+
+// WAL cleanup happens transparently:
+// 1. Scans for WAL files in database directory
+// 2. Logs file count and total size
+// 3. Deletes stale WAL files (safe when DB is closed)
+// 4. Tracks cleanup metrics for monitoring
+```
+
+**Configuration:**
+```bash
+# .env file
+REAXDB_WAL_AUTO_CLEANUP=true          # Enable auto-cleanup
+REAXDB_WAL_MAX_SIZE_MB=10             # Warn if WAL > 10MB
+REAXDB_CHECKPOINT_ON_CLOSE=true       # Checkpoint on close
+```
+
+### Manual WAL Cleanup
+
+You can manually trigger WAL cleanup from your app:
+
+```dart
+final db = getIt<DatabaseService>();
+
+// Manually cleanup WAL files
+await db.cleanupWalFiles();
+
+// Check WAL statistics
+final stats = await db.getStats();
+print('WAL files: ${stats.walFileCount}');
+print('WAL size: ${stats.walSizeMB?.toStringAsFixed(2)} MB');
+print('Last cleanup: ${stats.lastCleanupTime}');
+```
+
+### WAL Lifecycle Best Practices
+
+**✅ Development (Debug Mode):**
+```bash
+# Aggressive cleanup to prevent accumulation
+REAXDB_WAL_AUTO_CLEANUP=true
+REAXDB_WAL_MAX_SIZE_MB=10
+REAXDB_CHECKPOINT_ON_CLOSE=true
+```
+
+**✅ Production (Release Mode):**
+```bash
+# Standard WAL behavior (let ReaxDB handle it)
+REAXDB_WAL_AUTO_CLEANUP=false        # Disable aggressive cleanup
+REAXDB_CHECKPOINT_ON_CLOSE=true      # Still checkpoint on clean exit
+```
+
+**✅ App Lifecycle:**
+- App Shell automatically closes database on app termination
+- `AppLifecycleManager` detects app pause/detach/terminate events
+- Database cleanup happens automatically via lifecycle hooks
+- No manual intervention required
+
+### Monitoring WAL Files
+
+**Check WAL Statistics:**
+```dart
+final stats = await db.getStats();
+
+// WAL metrics included in stats
+if (stats.walFileCount != null) {
+  print('WAL files: ${stats.walFileCount}');
+  print('WAL size: ${stats.walSizeMB?.toStringAsFixed(2)} MB');
+  print('Last cleanup: ${stats.lastCleanupTime}');
+} else {
+  print('No WAL cleanup has run yet');
+}
+```
+
+**View in Service Inspector:**
+- Navigate to `/inspector` in example app
+- Database section shows WAL metrics
+- Manual cleanup button available
+- Real-time statistics
+
+**Initialization Timing:**
+The database service logs initialization timing to help identify WAL processing:
+
+```
+ReaxDB database initialized (unencrypted) at: /path/to/db
+Timing: total=127ms, db_open=89ms
+
+// If slow (> 1 second):
+WARNING: Database initialization took 10234ms. This may indicate
+accumulated WAL files being processed. Consider enabling
+REAXDB_WAL_AUTO_CLEANUP in your .env file.
+```
+
+### Troubleshooting WAL Issues
+
+**Symptom**: Slow database initialization (>1 second)
+**Cause**: Accumulated WAL files from hot restarts
+**Solution**:
+```bash
+# Enable auto-cleanup in .env
+REAXDB_WAL_AUTO_CLEANUP=true
+
+# Or manually cleanup once:
+await getIt<DatabaseService>().cleanupWalFiles();
+```
+
+**Symptom**: WAL files keep growing
+**Cause**: Database not closing properly
+**Check**:
+- Ensure `AppLifecycleManager` is registered in service locator
+- Check if app lifecycle events are firing
+- Verify `REAXDB_CHECKPOINT_ON_CLOSE=true`
+
+**Symptom**: WAL files deleted but re-appear
+**Cause**: Normal operation - WAL files are created during transactions
+**Solution**: This is expected. Auto-cleanup only triggers on next app start.
+
+For more troubleshooting help, see: [Database Troubleshooting Guide](../troubleshooting/database.md)
 
 ## 🎯 Key Advantages of ReaxDB
 

@@ -41,10 +41,8 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
   void _updateStatus() {
     if (mounted) {
       setState(() {
-        _dbStatus = _databaseService.connectionStatus.value
-            .toString()
-            .split('.')
-            .last;
+        _dbStatus =
+            _databaseService.connectionStatus.value.toString().split('.').last;
       });
     }
   }
@@ -101,26 +99,23 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
   }
 
   Future<void> _clearAllDocuments() async {
-    final confirmed = await showDialog<bool>(
+    final ui = getAdaptiveFactory(context);
+
+    final confirmed = await ui.showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear All Documents'),
-        content:
-            const Text('Are you sure you want to delete all demo documents?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Delete All'),
-          ),
-        ],
-      ),
+      title: const Text('Clear All Documents'),
+      content:
+          const Text('Are you sure you want to delete all demo documents?'),
+      actions: [
+        ui.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        ui.button(
+          label: 'Delete All',
+          onPressed: () => Navigator.pop(context, true),
+        ),
+      ],
     );
 
     if (confirmed == true) {
@@ -142,39 +137,97 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
       final stats = await _databaseService.getStats();
 
       if (mounted) {
-        showDialog(
+        final ui = getAdaptiveFactory(context);
+
+        ui.showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Database Statistics'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Status: ${stats.connectionStatus.name}'),
-                const SizedBox(height: 8),
-                Text('Total Documents: ${stats.totalDocuments}'),
-                const SizedBox(height: 8),
-                Text('Total Collections: ${stats.totalCollections}'),
-                const SizedBox(height: 8),
-                Text('Database Path:'),
+          title: const Text('Database Statistics'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Database Status',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text('Status: ${stats.connectionStatus.name}'),
+              const SizedBox(height: 4),
+              Text('Total Documents: ${stats.totalDocuments}'),
+              const SizedBox(height: 4),
+              Text('Total Collections: ${stats.totalCollections}'),
+              const SizedBox(height: 16),
+              const Text(
+                'WAL File Management',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (stats.walFileCount != null) ...[
+                Text('WAL Files: ${stats.walFileCount}'),
                 const SizedBox(height: 4),
                 Text(
-                  stats.databasePath ?? 'Unknown',
-                  style: const TextStyle(fontSize: 12),
+                  'WAL Size: ${stats.walSizeMB?.toStringAsFixed(2) ?? "0.00"} MB',
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                const SizedBox(height: 4),
+                if (stats.lastCleanupTime != null)
+                  Text(
+                    'Last Cleanup: ${_formatDateTime(stats.lastCleanupTime!)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+              ] else
+                const Text(
+                  'No WAL cleanup has run yet',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              const SizedBox(height: 16),
+              const Text(
+                'Database Path',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                stats.databasePath ?? 'Unknown',
+                style: const TextStyle(fontSize: 12),
               ),
             ],
           ),
+          actions: [
+            ui.textButton(
+              label: 'Close',
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
         );
       }
     } catch (e) {
       _showMessage('Failed to get stats: $e');
+    }
+  }
+
+  Future<void> _cleanupWalFiles() async {
+    try {
+      setState(() => _isLoading = true);
+      await _databaseService.cleanupWalFiles();
+      _showMessage('WAL files cleaned up successfully');
+      setState(() => _isLoading = false);
+    } catch (e) {
+      _showMessage('Failed to cleanup WAL files: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return '${difference.inSeconds}s ago';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
     }
   }
 
@@ -185,11 +238,11 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
         _messageTime = DateTime.now();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 3),
-        ),
+      final ui = getAdaptiveFactory(context);
+      ui.showSnackBar(
+        context,
+        message,
+        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -208,27 +261,30 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
-                'ReaxDB Local Storage',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ReaxDB Local Storage',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'This demo uses ReaxDB for local-only data storage. All data is stored on your device with no cloud synchronization.',
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Icon(Icons.storage, size: 16),
-                  const SizedBox(width: 8),
-                  Text('Status: $_dbStatus'),
-                ],
-              ),
-            ],
+                const SizedBox(height: 12),
+                const Text(
+                  'This demo uses ReaxDB for local-only data storage. All data is stored on your device with no cloud synchronization.',
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.storage, size: 16),
+                    const SizedBox(width: 8),
+                    Text('Status: $_dbStatus'),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -241,7 +297,6 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
               child: ui.button(
                 label: 'Add Document',
                 onPressed: _addDocument,
-                icon: Icons.add,
               ),
             ),
             const SizedBox(width: 8),
@@ -249,7 +304,6 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
               child: ui.button(
                 label: 'Clear All',
                 onPressed: _clearAllDocuments,
-                icon: Icons.delete_sweep,
               ),
             ),
           ],
@@ -263,7 +317,6 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
               child: ui.outlinedButton(
                 label: 'Refresh',
                 onPressed: _loadData,
-                icon: Icons.refresh,
               ),
             ),
             const SizedBox(width: 8),
@@ -271,7 +324,19 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
               child: ui.outlinedButton(
                 label: 'Show Stats',
                 onPressed: _showDatabaseStats,
-                icon: Icons.info_outline,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 8),
+
+        Row(
+          children: [
+            Expanded(
+              child: ui.outlinedButton(
+                label: 'Cleanup WAL Files',
+                onPressed: _cleanupWalFiles,
               ),
             ),
           ],
@@ -331,7 +396,7 @@ class _LocalDatabaseDemoScreenState extends State<LocalDatabaseDemoScreen> {
                 leading: const Icon(Icons.description),
                 title: Text(doc['title'] ?? 'Untitled'),
                 subtitle: Text(doc['content'] ?? ''),
-                trailing: IconButton(
+                trailing: ui.iconButton(
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () => _deleteDocument(doc['id']),
                 ),

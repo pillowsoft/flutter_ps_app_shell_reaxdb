@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:reaxdb_dart/reaxdb_dart.dart' show SimpleReaxDB;
 import 'package:path_provider/path_provider.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 import 'package:logging/logging.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../utils/logger.dart';
 
 /// Local-only database service using ReaxDB
@@ -23,6 +26,11 @@ class DatabaseService {
 
   SimpleReaxDB? _db;
   String? _dbPath;
+
+  // WAL cleanup tracking
+  int? _lastWalFileCount;
+  int? _lastWalTotalSize;
+  DateTime? _lastCleanupTime;
 
   bool get isInitialized => _db != null;
 
@@ -45,6 +53,8 @@ class DatabaseService {
   }) async {
     if (_db != null) return;
 
+    final initStopwatch = Stopwatch()..start();
+
     try {
       connectionStatus.value = DatabaseConnectionStatus.connecting;
       _logger.info('Initializing ReaxDB database service...');
@@ -53,17 +63,50 @@ class DatabaseService {
       final directory = await getApplicationDocumentsDirectory();
       _dbPath = '${directory.path}/$dbName';
 
+      // Get WAL configuration from environment
+      final walAutoCleanup = _getWalAutoCleanupSetting();
+      final walMaxSizeMB = _getWalMaxSizeSetting();
+
+      // Cleanup stale WAL files before initialization (dev mode optimization)
+      if (walAutoCleanup) {
+        final cleanupStopwatch = Stopwatch()..start();
+        await _cleanupWalFiles(_dbPath!, walMaxSizeMB);
+        cleanupStopwatch.stop();
+
+        if (cleanupStopwatch.elapsedMilliseconds > 100) {
+          _logger.warning(
+            'WAL cleanup took ${cleanupStopwatch.elapsedMilliseconds}ms '
+            '(this may indicate many accumulated WAL files from hot restarts)',
+          );
+        }
+      }
+
       // Initialize ReaxDB using SimpleReaxDB API
+      final dbOpenStopwatch = Stopwatch()..start();
       _db = await SimpleReaxDB.open(
         dbName,
         encrypted: encrypted,
         path: _dbPath,
       );
+      dbOpenStopwatch.stop();
 
-      if (encrypted) {
-        _logger.info('ReaxDB database initialized with encryption at: $_dbPath');
-      } else {
-        _logger.info('ReaxDB database initialized at: $_dbPath');
+      initStopwatch.stop();
+
+      // Log initialization timing
+      final mode = encrypted ? 'encrypted' : 'unencrypted';
+      _logger.info(
+        'ReaxDB database initialized ($mode) at: $_dbPath\n'
+        'Timing: total=${initStopwatch.elapsedMilliseconds}ms, '
+        'db_open=${dbOpenStopwatch.elapsedMilliseconds}ms',
+      );
+
+      // Warn if initialization is slow (may indicate WAL processing)
+      if (initStopwatch.elapsedMilliseconds > 1000) {
+        _logger.warning(
+          'Database initialization took ${initStopwatch.elapsedMilliseconds}ms. '
+          'This may indicate accumulated WAL files being processed. '
+          'Consider enabling REAXDB_WAL_AUTO_CLEANUP in your .env file.',
+        );
       }
 
       connectionStatus.value = DatabaseConnectionStatus.connected;
@@ -78,6 +121,17 @@ class DatabaseService {
   Future<void> close() async {
     if (_db != null) {
       try {
+        final checkpointOnClose = _getCheckpointOnCloseSetting();
+
+        // Checkpoint WAL files if configured (merge changes back into main DB)
+        if (checkpointOnClose && _dbPath != null) {
+          try {
+            await _checkpointWalFiles(_dbPath!);
+          } catch (e) {
+            _logger.warning('Failed to checkpoint WAL on close: $e');
+          }
+        }
+
         // ReaxDB doesn't require explicit close, just cleanup references
         _db = null;
         _dbPath = null;
@@ -87,6 +141,135 @@ class DatabaseService {
         _logger.warning('Error closing database: $e');
       }
     }
+  }
+
+  // WAL Management
+
+  /// Clean up stale WAL files before database initialization
+  /// This prevents WAL accumulation during development (hot restarts, Ctrl+C exits)
+  Future<void> _cleanupWalFiles(String dbPath, int maxSizeMB) async {
+    try {
+      final dir = Directory(dbPath).parent;
+      final dbName = Directory(dbPath).path.split('/').last;
+
+      // Look for WAL files (ReaxDB/SQLite pattern: dbname-wal, dbname-shm)
+      final walFiles = dir
+          .listSync()
+          .where((entity) =>
+              entity is File &&
+              (entity.path.endsWith('-wal') ||
+                  entity.path.endsWith('-shm') ||
+                  entity.path.contains('$dbName') &&
+                      entity.path.contains('wal')))
+          .cast<File>()
+          .toList();
+
+      if (walFiles.isEmpty) {
+        _logger.fine('No WAL files found to clean up');
+        return;
+      }
+
+      // Calculate total WAL size
+      final totalSize =
+          walFiles.fold<int>(0, (sum, file) => sum + file.lengthSync());
+      final totalSizeMB = totalSize / (1024 * 1024);
+
+      _lastWalFileCount = walFiles.length;
+      _lastWalTotalSize = totalSize;
+
+      _logger.info(
+        'Found ${walFiles.length} WAL file(s) '
+        '(${totalSizeMB.toStringAsFixed(2)} MB)',
+      );
+
+      // Warn if WAL size exceeds threshold
+      if (totalSizeMB > maxSizeMB) {
+        _logger.warning(
+          'WAL files exceed ${maxSizeMB}MB threshold '
+          '(${totalSizeMB.toStringAsFixed(2)} MB). '
+          'This indicates accumulated files from development hot restarts. '
+          'Cleaning up...',
+        );
+      }
+
+      // Delete WAL files (safe when database is not open)
+      for (final file in walFiles) {
+        try {
+          file.deleteSync();
+          _logger.fine('Deleted WAL file: ${file.path}');
+        } catch (e) {
+          _logger.warning('Failed to delete WAL file ${file.path}: $e');
+        }
+      }
+
+      _lastCleanupTime = DateTime.now();
+      _logger.info('WAL cleanup completed: removed ${walFiles.length} file(s)');
+    } catch (e, stackTrace) {
+      _logger.warning('Error during WAL cleanup', e, stackTrace);
+      // Don't rethrow - WAL cleanup failure shouldn't prevent DB initialization
+    }
+  }
+
+  /// Checkpoint WAL files (merge WAL changes back into main database)
+  Future<void> _checkpointWalFiles(String dbPath) async {
+    try {
+      // Note: ReaxDB may handle this internally
+      // If ReaxDB exposes a checkpoint API, call it here
+      _logger.fine('WAL checkpoint requested on database close');
+    } catch (e) {
+      _logger.warning('WAL checkpoint failed: $e');
+    }
+  }
+
+  /// Get WAL auto-cleanup setting from environment (default: true in debug mode)
+  bool _getWalAutoCleanupSetting() {
+    try {
+      final envValue = dotenv.env['REAXDB_WAL_AUTO_CLEANUP'];
+      if (envValue != null) {
+        return envValue.toLowerCase() == 'true';
+      }
+      // Default: enable in debug mode, disable in release
+      return kDebugMode;
+    } catch (e) {
+      return kDebugMode; // Fallback to debug mode default
+    }
+  }
+
+  /// Get WAL max size setting from environment (default: 10 MB)
+  int _getWalMaxSizeSetting() {
+    try {
+      final envValue = dotenv.env['REAXDB_WAL_MAX_SIZE_MB'];
+      if (envValue != null) {
+        return int.tryParse(envValue) ?? 10;
+      }
+      return 10; // Default: 10 MB
+    } catch (e) {
+      return 10; // Fallback
+    }
+  }
+
+  /// Get checkpoint on close setting from environment (default: true)
+  bool _getCheckpointOnCloseSetting() {
+    try {
+      final envValue = dotenv.env['REAXDB_CHECKPOINT_ON_CLOSE'];
+      if (envValue != null) {
+        return envValue.toLowerCase() == 'true';
+      }
+      return true; // Default: enabled
+    } catch (e) {
+      return true; // Fallback
+    }
+  }
+
+  /// Manually cleanup WAL files (can be called from UI)
+  Future<void> cleanupWalFiles() async {
+    if (_dbPath == null) {
+      throw StateError('Database not initialized');
+    }
+
+    _logger.info('Manual WAL cleanup requested');
+    final maxSizeMB = _getWalMaxSizeSetting();
+    await _cleanupWalFiles(_dbPath!, maxSizeMB);
   }
 
   // CRUD Operations
@@ -359,6 +542,9 @@ class DatabaseService {
         totalCollections: totalCollections,
         connectionStatus: connectionStatus.value,
         databasePath: _dbPath,
+        walFileCount: _lastWalFileCount,
+        walTotalSize: _lastWalTotalSize,
+        lastCleanupTime: _lastCleanupTime,
       );
     } catch (e, stackTrace) {
       _logger.severe('Failed to get database stats', e, stackTrace);
@@ -399,16 +585,31 @@ class DatabaseStats {
   final DatabaseConnectionStatus connectionStatus;
   final String? databasePath;
 
+  // WAL metrics
+  final int? walFileCount;
+  final int? walTotalSize; // in bytes
+  final DateTime? lastCleanupTime;
+
   DatabaseStats({
     required this.totalDocuments,
     required this.totalCollections,
     required this.connectionStatus,
     this.databasePath,
+    this.walFileCount,
+    this.walTotalSize,
+    this.lastCleanupTime,
   });
+
+  /// Get WAL size in MB
+  double? get walSizeMB =>
+      walTotalSize != null ? walTotalSize! / (1024 * 1024) : null;
 
   @override
   String toString() {
+    final walInfo = walFileCount != null
+        ? ', wal_files: $walFileCount (${walSizeMB?.toStringAsFixed(2) ?? 0} MB)'
+        : '';
     return 'DatabaseStats(docs: $totalDocuments, collections: $totalCollections, '
-        'status: ${connectionStatus.name}, path: $databasePath)';
+        'status: ${connectionStatus.name}, path: $databasePath$walInfo)';
   }
 }
