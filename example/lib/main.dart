@@ -400,7 +400,6 @@ void main() {
               context.push('/inspector');
             },
           ),
-
         ],
         themeExtensions: (theme) {
           // Custom theme extensions can be added here

@@ -400,131 +400,120 @@ class _ErrorHandlingDemoScreenState extends State<ErrorHandlingDemoScreen>
   }
 
   void _showSuccessMessage(ErrorDemo demo) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(
-                '${demo.title} succeeded after ${_retryCount} ${_retryCount == 1 ? 'retry' : 'retries'}'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      '${demo.title} succeeded after ${_retryCount} ${_retryCount == 1 ? 'retry' : 'retries'}',
+      duration: const Duration(seconds: 3),
+      backgroundColor: Colors.green,
     );
   }
 
   void _showGlobalErrorDialog() {
-    showDialog(
+    final ui = getAdaptiveFactory(context);
+
+    ui.showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.error, color: Colors.red, size: 48),
-        title: const Text('Critical Error'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'A critical error has occurred that requires immediate attention.',
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Error Code: CRIT_001\n'
-                'Component: Core System\n'
-                'Timestamp: 2024-01-15 14:30:22',
-                style: TextStyle(fontFamily: 'monospace'),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Dismiss'),
+      title: const Text('Critical Error'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error, color: Colors.red, size: 48),
+          const SizedBox(height: 16),
+          const Text(
+            'A critical error has occurred that requires immediate attention.',
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showErrorReportDialog();
-            },
-            child: const Text('Report Error'),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'Error Code: CRIT_001\n'
+              'Component: Core System\n'
+              'Timestamp: 2024-01-15 14:30:22',
+              style: TextStyle(fontFamily: 'monospace'),
+            ),
           ),
         ],
       ),
+      actions: [
+        ui.textButton(
+          label: 'Dismiss',
+          onPressed: () => Navigator.pop(context),
+        ),
+        ui.button(
+          label: 'Report Error',
+          onPressed: () {
+            Navigator.pop(context);
+            _showErrorReportDialog();
+          },
+        ),
+      ],
     );
   }
 
   void _showErrorReportDialog() {
     final reportController = TextEditingController();
+    final ui = getAdaptiveFactory(context);
 
-    showDialog(
+    ui.showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error Report'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-                'Please describe what you were doing when the error occurred:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reportController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Describe the steps that led to this error...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'The following information will be included:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '• Device information\n'
-                    '• App version\n'
-                    '• Error logs\n'
-                    '• No personal data',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      title: const Text('Error Report'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+              'Please describe what you were doing when the error occurred:'),
+          const SizedBox(height: 16),
+          ui.textField(
+            controller: reportController,
+            maxLines: 4,
+            hintText: 'Describe the steps that led to this error...',
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _sendErrorReport(reportController.text);
-            },
-            child: const Text('Send Report'),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'The following information will be included:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '• Device information\n'
+                  '• App version\n'
+                  '• Error logs\n'
+                  '• No personal data',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ],
       ),
+      actions: [
+        ui.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context),
+        ),
+        ui.button(
+          label: 'Send Report',
+          onPressed: () {
+            Navigator.pop(context);
+            _sendErrorReport(reportController.text);
+          },
+        ),
+      ],
     );
   }
 
@@ -532,18 +521,12 @@ class _ErrorHandlingDemoScreenState extends State<ErrorHandlingDemoScreen>
     // Simulate sending error report
     await Future.delayed(const Duration(seconds: 2));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Text('Error report sent successfully. Thank you!'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      'Error report sent successfully. Thank you!',
+      duration: const Duration(seconds: 3),
+      backgroundColor: Colors.green,
     );
   }
 
@@ -904,13 +887,12 @@ class _ErrorHandlingDemoScreenState extends State<ErrorHandlingDemoScreen>
           }
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text(_isOffline ? 'Switched to offline mode' : 'Back online'),
-            backgroundColor: _isOffline ? Colors.orange : Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
+        final ui = getAdaptiveFactory(context);
+        ui.showSnackBar(
+          context,
+          _isOffline ? 'Switched to offline mode' : 'Back online',
+          duration: const Duration(seconds: 3),
+          backgroundColor: _isOffline ? Colors.orange : Colors.green,
         );
         break;
 
@@ -922,14 +904,14 @@ class _ErrorHandlingDemoScreenState extends State<ErrorHandlingDemoScreen>
           }
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_hasSlowConnection
-                ? 'Simulating slow connection'
-                : 'Connection speed normal'),
-            backgroundColor: _hasSlowConnection ? Colors.orange : Colors.blue,
-            behavior: SnackBarBehavior.floating,
-          ),
+        final ui = getAdaptiveFactory(context);
+        ui.showSnackBar(
+          context,
+          _hasSlowConnection
+              ? 'Simulating slow connection'
+              : 'Connection speed normal',
+          duration: const Duration(seconds: 3),
+          backgroundColor: _hasSlowConnection ? Colors.orange : Colors.blue,
         );
         break;
 

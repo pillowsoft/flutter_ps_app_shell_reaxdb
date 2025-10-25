@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_shell/flutter_app_shell.dart';
 
-enum AuthMode { signIn, signUp, magicLink }
+enum AuthMode { signIn, signUp }
 
 class AuthDemoScreen extends StatefulWidget {
   const AuthDemoScreen({super.key});
@@ -11,7 +11,7 @@ class AuthDemoScreen extends StatefulWidget {
 }
 
 class _AuthDemoScreenState extends State<AuthDemoScreen> {
-  AuthMode _currentMode = AuthMode.magicLink;
+  AuthMode _currentMode = AuthMode.signIn;
 
   // Controllers for form fields
   final _emailController = TextEditingController();
@@ -126,14 +126,6 @@ class _AuthDemoScreenState extends State<AuthDemoScreen> {
                     const SizedBox(height: 16),
                     ui.segmentedControl<AuthMode>(
                       children: {
-                        AuthMode.magicLink: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.link),
-                            SizedBox(width: 4),
-                            Text('Magic Link'),
-                          ],
-                        ),
                         AuthMode.signIn: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -214,182 +206,11 @@ class _AuthDemoScreenState extends State<AuthDemoScreen> {
 
   Widget _buildAuthForm(AdaptiveWidgetFactory ui) {
     switch (_currentMode) {
-      case AuthMode.magicLink:
-        return _buildMagicLinkForm(ui);
       case AuthMode.signIn:
         return _buildSignInForm(ui);
       case AuthMode.signUp:
         return _buildSignUpForm(ui);
     }
-  }
-
-  Widget _buildMagicLinkForm(AdaptiveWidgetFactory ui) {
-    final databaseService = DatabaseService.instance;
-    final isAppIdConfigured = databaseService.appId != null &&
-        databaseService.appId!.isNotEmpty &&
-        !databaseService.appId!.startsWith('local-only-');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Magic Link Authentication',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Enter your email address and we\'ll send you a 6-digit verification code.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        const SizedBox(height: 8),
-        if (!isAppIdConfigured) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange, width: 1),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.settings, color: Colors.orange, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Configuration Required',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Magic link authentication requires an InstantDB app ID. Configure INSTANTDB_APP_ID in your .env file to enable real email delivery.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.orange.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green, width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'InstantDB configured with app ID: ${databaseService.appId}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green.shade700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-        ui.textField(
-          controller: _emailController,
-          labelText: 'Email Address',
-          hintText: 'Enter your email',
-          keyboardType: TextInputType.emailAddress,
-          prefixIcon: const Icon(Icons.email),
-        ),
-        if (!_isCodeSent) ...[
-          const SizedBox(height: 24),
-          ui.button(
-            label: _isLoading ? 'Sending...' : 'Send Magic Link',
-            onPressed: _isLoading ? () {} : _sendMagicLink,
-          ),
-        ],
-        if (_isCodeSent) ...[
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue, width: 1),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.email, color: Colors.blue, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Check your email!',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'We sent a 6-digit verification code to your email address. Enter it below to sign in.',
-                  style: TextStyle(
-                    color: Colors.blue.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          ui.textField(
-            controller: _codeController,
-            labelText: 'Verification Code',
-            hintText: 'Enter 6-digit code',
-            keyboardType: TextInputType.number,
-            prefixIcon: const Icon(Icons.pin),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ui.button(
-                  label: _isLoading ? 'Verifying...' : 'Verify Code',
-                  onPressed: _isLoading ? () {} : _verifyMagicCode,
-                ),
-              ),
-              const SizedBox(width: 12),
-              ui.outlinedButton(
-                label: 'Reset',
-                onPressed: _resetMagicLink,
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
   }
 
   Widget _buildSignInForm(AdaptiveWidgetFactory ui) {
@@ -624,14 +445,6 @@ class _AuthDemoScreenState extends State<AuthDemoScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  void _resetMagicLink() {
-    setState(() {
-      _isCodeSent = false;
-      _codeController.clear();
-      _resultMessage = '';
-    });
   }
 
   void _resetForm() {

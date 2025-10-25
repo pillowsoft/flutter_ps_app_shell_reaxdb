@@ -152,12 +152,11 @@ class _AccessibilityDemoScreenState extends State<AccessibilityDemoScreen>
     if (_formKey.currentState!.validate()) {
       _announceToScreenReader('Form submitted successfully');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('Thank you for your feedback, ${_nameController.text}!'),
-          duration: const Duration(seconds: 3),
-        ),
+      final ui = getAdaptiveFactory(context);
+      ui.showSnackBar(
+        context,
+        'Thank you for your feedback, ${_nameController.text}!',
+        duration: const Duration(seconds: 3),
       );
 
       // Clear form
@@ -829,19 +828,9 @@ class _AccessibilityDemoScreenState extends State<AccessibilityDemoScreen>
                 child: Semantics(
                   button: true,
                   label: 'Submit feedback form',
-                  child: ElevatedButton.icon(
+                  child: ui.button(
+                    label: 'Submit Feedback',
                     onPressed: _submitForm,
-                    icon: const Icon(Icons.send),
-                    label: Text(
-                      'Submit Feedback',
-                      style: TextStyle(fontSize: 16 * _textScale),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
                   ),
                 ),
               ),
@@ -958,34 +947,34 @@ class _AccessibilityDemoScreenState extends State<AccessibilityDemoScreen>
   }
 
   void _showTextSizeDialog() {
-    showDialog(
+    final ui = getAdaptiveFactory(context);
+
+    ui.showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Text Size'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Current size: ${(_textScale * 100).toInt()}%'),
-            const SizedBox(height: 16),
-            Slider(
-              value: _textScale,
-              min: 0.8,
-              max: 2.0,
-              divisions: 12,
-              label: '${(_textScale * 100).toInt()}%',
-              onChanged: (value) {
-                setState(() => _textScale = value);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+      title: const Text('Text Size'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Current size: ${(_textScale * 100).toInt()}%'),
+          const SizedBox(height: 16),
+          Slider(
+            value: _textScale,
+            min: 0.8,
+            max: 2.0,
+            divisions: 12,
+            label: '${(_textScale * 100).toInt()}%',
+            onChanged: (value) {
+              setState(() => _textScale = value);
+            },
           ),
         ],
       ),
+      actions: [
+        ui.textButton(
+          label: 'OK',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
     );
   }
 

@@ -305,7 +305,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen>
 
       return Scaffold(
         key: ValueKey('performance_scaffold_$uiSystem'),
-        appBar: _buildAppBar(theme),
+        appBar: _buildAppBar(theme, ui),
         body: Column(
           children: [
             // Performance metrics
@@ -327,7 +327,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen>
     });
   }
 
-  PreferredSizeWidget _buildAppBar(ThemeData theme) {
+  PreferredSizeWidget _buildAppBar(ThemeData theme, AdaptiveWidgetFactory ui) {
     return AppBar(
       title: SlideTransition(
         position: _headerSlide,
@@ -346,7 +346,7 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen>
         ),
       ),
       actions: [
-        IconButton(
+        ui.iconButton(
           icon: Icon(_showMetrics ? Icons.analytics : Icons.analytics_outlined),
           onPressed: () {
             setState(() => _showMetrics = !_showMetrics);
@@ -488,22 +488,13 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen>
       child: Column(
         children: [
           // Search bar
-          TextField(
+          ui.textField(
             onChanged: (value) {
               setState(() => _searchQuery = value);
               _applyFiltersAndSort();
             },
-            decoration: InputDecoration(
-              hintText: 'Search items...',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
+            hintText: 'Search items...',
+            prefixIcon: const Icon(Icons.search),
           ),
 
           const SizedBox(height: 12),
@@ -985,18 +976,15 @@ class _PerformanceDemoScreenState extends State<PerformanceDemoScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         FloatingActionButton(
-          heroTag: "add",
-          mini: true,
           onPressed: () => _generateData(1000, append: true),
-          child: const Icon(Icons.add),
           tooltip: 'Add 1K Items',
+          child: const Icon(Icons.add),
         ),
         const SizedBox(height: 8),
         FloatingActionButton(
-          heroTag: "refresh",
           onPressed: () => _generateData(_currentDataSize),
-          child: const Icon(Icons.refresh),
           tooltip: 'Regenerate Data',
+          child: const Icon(Icons.refresh),
         ),
       ],
     );

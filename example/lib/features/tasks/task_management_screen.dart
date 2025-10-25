@@ -240,22 +240,22 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
   }
 
   Future<void> _deleteTask(Task task) async {
-    final confirm = await showDialog<bool>(
+    final dialogUi = getAdaptiveFactory(context);
+
+    final confirm = await dialogUi.showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Task'),
-        content: Text('Are you sure you want to delete "${task.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: const Text('Delete Task'),
+      content: Text('Are you sure you want to delete "${task.title}"?'),
+      actions: [
+        dialogUi.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        dialogUi.button(
+          label: 'Delete',
+          onPressed: () => Navigator.pop(context, true),
+        ),
+      ],
     );
 
     if (confirm == true) {
@@ -267,22 +267,22 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
   Future<void> _bulkDelete() async {
     if (_selectedTaskIds.isEmpty) return;
 
-    final confirm = await showDialog<bool>(
+    final dialogUi = getAdaptiveFactory(context);
+
+    final confirm = await dialogUi.showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Tasks'),
-        content: Text('Delete ${_selectedTaskIds.length} selected tasks?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: const Text('Delete Tasks'),
+      content: Text('Delete ${_selectedTaskIds.length} selected tasks?'),
+      actions: [
+        dialogUi.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        dialogUi.button(
+          label: 'Delete',
+          onPressed: () => Navigator.pop(context, true),
+        ),
+      ],
     );
 
     if (confirm == true) {
@@ -340,11 +340,11 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      message,
+      duration: const Duration(seconds: 3),
     );
   }
 
@@ -369,46 +369,46 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
 
       return Scaffold(
         key: ValueKey('task_management_scaffold_$uiSystem'),
-        appBar: _buildAppBar(theme),
+        appBar: _buildAppBar(theme, ui),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? _buildErrorView(ui)
                 : _buildContent(theme, ui),
-        floatingActionButton: _buildFAB(theme),
+        floatingActionButton: _buildFAB(theme, ui),
       );
     });
   }
 
-  PreferredSizeWidget _buildAppBar(ThemeData theme) {
+  PreferredSizeWidget _buildAppBar(ThemeData theme, AdaptiveWidgetFactory ui) {
     return AppBar(
       title: _isSelectionMode
           ? Text('${_selectedTaskIds.length} selected')
           : const Text('Task Management'),
       actions: [
         if (_isSelectionMode) ...[
-          IconButton(
+          ui.iconButton(
             icon: const Icon(Icons.select_all),
             onPressed: _selectAll,
             tooltip: 'Select All',
           ),
-          IconButton(
+          ui.iconButton(
             icon: const Icon(Icons.delete),
             onPressed: _bulkDelete,
             tooltip: 'Delete Selected',
           ),
-          IconButton(
+          ui.iconButton(
             icon: const Icon(Icons.close),
             onPressed: _clearSelection,
             tooltip: 'Cancel',
           ),
         ] else ...[
-          IconButton(
+          ui.iconButton(
             icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
             onPressed: () => setState(() => _isGridView = !_isGridView),
             tooltip: _isGridView ? 'List View' : 'Grid View',
           ),
-          IconButton(
+          ui.iconButton(
             icon: Icon(
                 _showStatistics ? Icons.analytics_outlined : Icons.analytics),
             onPressed: () => setState(() => _showStatistics = !_showStatistics),
@@ -479,28 +479,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
       child: Column(
         children: [
           // Search bar
-          TextField(
+          ui.textField(
             onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Search tasks...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() => _searchQuery = '');
-                        _applyFilters();
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
+            hintText: 'Search tasks...',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? ui.iconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      setState(() => _searchQuery = '');
+                      _applyFilters();
+                    },
+                  )
+                : null,
           ),
 
           const SizedBox(height: 12),
@@ -778,22 +769,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
           await _updateTaskStatus(task, TaskStatus.done);
           return false;
         } else {
-          return await showDialog<bool>(
+          final dialogUi = getAdaptiveFactory(context);
+          return await dialogUi.showDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Delete Task'),
-              content: Text('Delete "${task.title}"?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
+            title: const Text('Delete Task'),
+            content: Text('Delete "${task.title}"?'),
+            actions: [
+              dialogUi.textButton(
+                label: 'Cancel',
+                onPressed: () => Navigator.pop(context, false),
+              ),
+              dialogUi.button(
+                label: 'Delete',
+                onPressed: () => Navigator.pop(context, true),
+              ),
+            ],
           );
         }
       },
@@ -1201,7 +1191,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
     );
   }
 
-  Widget _buildFAB(ThemeData theme) {
+  Widget _buildFAB(ThemeData theme, AdaptiveWidgetFactory ui) {
     return ScaleTransition(
       scale: _fabScale,
       child: FloatingActionButton.extended(

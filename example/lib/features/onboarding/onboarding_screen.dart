@@ -85,15 +85,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               alignment: Alignment.topRight,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: TextButton(
+                child: ui.textButton(
+                  label: 'Skip',
                   onPressed: _skipOnboarding,
-                  child: Text(
-                    'Skip',
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
-                      fontSize: 16,
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -183,24 +177,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56,
-                    child: ElevatedButton(
+                    child: ui.button(
+                      label: _currentPage == _pages.length - 1
+                          ? 'Get Started'
+                          : 'Next',
                       onPressed: _goToNextPage,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _pages[_currentPage].color,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Text(
-                        _currentPage == _pages.length - 1
-                            ? 'Get Started'
-                            : 'Next',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
                     ),
                   ),
                 ],

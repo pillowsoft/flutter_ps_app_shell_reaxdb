@@ -121,10 +121,10 @@ class SettingsScreen extends StatelessWidget {
             label: 'Reset to Defaults',
             onPressed: () {
               settingsStore.resetToDefaults();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Settings reset to defaults'),
-                ),
+              ui.showSnackBar(
+                context,
+                'Settings reset to defaults',
+                duration: const Duration(seconds: 3),
               );
             },
           ),
@@ -354,16 +354,16 @@ class SettingsScreen extends StatelessWidget {
             try {
               final windowStateService = getIt<WindowStateService>();
               await windowStateService.resetWindowPosition();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Window position reset'),
-                ),
+              ui.showSnackBar(
+                context,
+                'Window position reset',
+                duration: const Duration(seconds: 3),
               );
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Window service not available'),
-                ),
+              ui.showSnackBar(
+                context,
+                'Window service not available',
+                duration: const Duration(seconds: 3),
               );
             }
           },
@@ -377,16 +377,16 @@ class SettingsScreen extends StatelessWidget {
             try {
               final windowStateService = getIt<WindowStateService>();
               await windowStateService.testSaveCurrentState();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Window state saved manually'),
-                ),
+              ui.showSnackBar(
+                context,
+                'Window state saved manually',
+                duration: const Duration(seconds: 3),
               );
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Save failed - check logs'),
-                ),
+              ui.showSnackBar(
+                context,
+                'Save failed - check logs',
+                duration: const Duration(seconds: 3),
               );
             }
           },

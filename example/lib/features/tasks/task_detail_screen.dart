@@ -121,23 +121,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen>
   }
 
   Future<void> _deleteTask() async {
-    final confirm = await showDialog<bool>(
+    final dialogUi = getAdaptiveFactory(context);
+
+    final confirm = await dialogUi.showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Task'),
-        content:
-            Text('Are you sure you want to delete "${_currentTask.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: const Text('Delete Task'),
+      content: Text('Are you sure you want to delete "${_currentTask.title}"?'),
+      actions: [
+        dialogUi.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        dialogUi.button(
+          label: 'Delete',
+          onPressed: () => Navigator.pop(context, true),
+        ),
+      ],
     );
 
     if (confirm == true) {
@@ -149,11 +148,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen>
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      message,
+      duration: const Duration(seconds: 3),
     );
   }
 
@@ -172,7 +171,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen>
         appBar: AppBar(
           title: const Text('Task Details'),
           actions: [
-            IconButton(
+            ui.iconButton(
               icon: const Icon(Icons.edit),
               onPressed: _editTask,
               tooltip: 'Edit Task',
@@ -971,10 +970,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen>
           child: Row(
             children: [
               Expanded(
-                child: ui.button(
+                child: ui.outlinedButton(
                   label: 'Mark as To Do',
                   onPressed: () => _updateTaskStatus(TaskStatus.todo),
-                  variant: ButtonVariant.secondary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -999,15 +997,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen>
               child: ui.button(
                 label: 'Mark as Done',
                 onPressed: () => _updateTaskStatus(TaskStatus.done),
-                variant: ButtonVariant.primary,
               ),
             ),
             if (_currentTask.status != TaskStatus.inProgress) ...[
               const SizedBox(width: 8),
-              ui.button(
+              ui.outlinedButton(
                 label: 'Start',
                 onPressed: () => _updateTaskStatus(TaskStatus.inProgress),
-                variant: ButtonVariant.secondary,
               ),
             ],
           ],

@@ -316,9 +316,7 @@ Created document ID: $docId
 Document title: ${doc?['title']}
 Database stats: ${stats.totalDocuments} total docs, ${stats.totalCollections} collections
 Connection: ${stats.connectionStatus.name}
-Sync Status: ${stats.syncStatus.name}
-Real-time updates: ${stats.realtimeUpdates}
-Authenticated: ${stats.isAuthenticated}''';
+Database path: ${stats.databasePath ?? 'Unknown'}''';
       });
     } catch (e) {
       setState(() => _databaseResult = '❌ Database test failed: $e');

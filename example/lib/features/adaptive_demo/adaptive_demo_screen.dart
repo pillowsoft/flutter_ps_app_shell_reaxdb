@@ -138,7 +138,7 @@ class _AdaptiveDemoScreenState extends State<AdaptiveDemoScreen> {
                             labelText: 'Search Field',
                             hintText: 'Search for something...',
                             prefixIcon: const Icon(Icons.search),
-                            suffixIcon: IconButton(
+                            suffixIcon: ui.iconButton(
                               icon: const Icon(Icons.clear),
                               onPressed: () => _textController.clear(),
                             ),
@@ -163,7 +163,7 @@ class _AdaptiveDemoScreenState extends State<AdaptiveDemoScreen> {
                             labelText: 'Password',
                             hintText: 'Enter your password...',
                             prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
+                            suffixIcon: ui.iconButton(
                               icon: Icon(_passwordVisible
                                   ? Icons.visibility
                                   : Icons.visibility_off),

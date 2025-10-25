@@ -587,21 +587,17 @@ class ServiceInspectorScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Connection: ${db.connectionStatus.value.name}'),
-                Text('Sync Status: ${db.syncStatus.value.name}'),
-                Text('Authenticated: ${stats.isAuthenticated}'),
                 Text('Total Documents: ${stats.totalDocuments}'),
                 Text('Total Collections: ${stats.totalCollections}'),
-                Text('Real-time Updates: ${db.realtimeUpdates.value}'),
-                if (db.lastSyncTime.value != null)
-                  Text('Last Sync: ${db.lastSyncTime.value}'),
+                Text('Database Path: ${stats.databasePath ?? 'Unknown'}'),
                 const SizedBox(height: 16),
                 const Text('Features:',
                     style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('• Real-time synchronization'),
-                const Text('• Built-in authentication'),
-                const Text('• Offline-first storage'),
-                const Text('• Reactive queries'),
-                const Text('• Local-only or cloud-sync modes'),
+                const Text('• Local-only storage'),
+                const Text('• High-performance (21,000+ writes/sec)'),
+                const Text('• Optional AES-256 encryption'),
+                const Text('• Reactive queries with Signals'),
+                const Text('• Zero native dependencies'),
               ],
             );
           });

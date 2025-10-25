@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_app_shell/flutter_app_shell.dart';
 import '../../models/task_model.dart';
-import 'dart:math';
 
 /// Advanced task form with validation and conditional fields
 class TaskFormScreen extends StatefulWidget {
@@ -136,23 +135,22 @@ class _TaskFormScreenState extends State<TaskFormScreen>
   Future<bool> _onWillPop() async {
     if (!_hasChanges) return true;
 
-    final result = await showDialog<bool>(
+    final dialogUi = getAdaptiveFactory(context);
+    final result = await dialogUi.showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Discard Changes?'),
-        content: const Text(
-            'You have unsaved changes. Are you sure you want to leave?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+      title: const Text('Discard Changes?'),
+      content: const Text(
+          'You have unsaved changes. Are you sure you want to leave?'),
+      actions: [
+        dialogUi.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        dialogUi.button(
+          label: 'Discard',
+          onPressed: () => Navigator.pop(context, true),
+        ),
+      ],
     );
 
     return result ?? false;
@@ -308,12 +306,12 @@ class _TaskFormScreenState extends State<TaskFormScreen>
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
-        behavior: SnackBarBehavior.floating,
-      ),
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      message,
+      duration: const Duration(seconds: 3),
+      backgroundColor: isError ? Colors.red : null,
     );
   }
 
@@ -391,38 +389,34 @@ class _TaskFormScreenState extends State<TaskFormScreen>
 
   void _addAssignee() {
     final controller = TextEditingController();
+    final dialogUi = getAdaptiveFactory(context);
 
-    showDialog(
+    dialogUi.showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Assignee'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Name or Email',
-            hintText: 'john.doe@example.com',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                setState(() {
-                  _assignees.add(controller.text.trim());
-                  _hasChanges = true;
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
+      title: const Text('Add Assignee'),
+      content: dialogUi.textField(
+        controller: controller,
+        labelText: 'Name or Email',
+        hintText: 'john.doe@example.com',
       ),
+      actions: [
+        dialogUi.textButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context),
+        ),
+        dialogUi.button(
+          label: 'Add',
+          onPressed: () {
+            if (controller.text.trim().isNotEmpty) {
+              setState(() {
+                _assignees.add(controller.text.trim());
+                _hasChanges = true;
+              });
+              Navigator.pop(context);
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -444,9 +438,9 @@ class _TaskFormScreenState extends State<TaskFormScreen>
             title: Text(widget.task == null ? 'New Task' : 'Edit Task'),
             actions: [
               if (_hasChanges)
-                TextButton(
+                ui.textButton(
+                  label: 'Save',
                   onPressed: _saveTask,
-                  child: const Text('Save'),
                 ),
             ],
           ),
@@ -705,7 +699,7 @@ class _TaskFormScreenState extends State<TaskFormScreen>
                   // Assignees
                   _buildSection(
                     title: 'Assignees',
-                    trailing: IconButton(
+                    trailing: ui.iconButton(
                       icon: const Icon(Icons.add),
                       onPressed: _addAssignee,
                     ),
@@ -738,7 +732,7 @@ class _TaskFormScreenState extends State<TaskFormScreen>
                   if (_dueDate != null)
                     _buildSection(
                       title: 'Reminders',
-                      trailing: IconButton(
+                      trailing: ui.iconButton(
                         icon: const Icon(Icons.add),
                         onPressed: _addReminder,
                       ),
@@ -759,7 +753,7 @@ class _TaskFormScreenState extends State<TaskFormScreen>
                                   ),
                                   title: Text(_formatReminderTime(reminder)),
                                   subtitle: Text(reminder.type.name),
-                                  trailing: IconButton(
+                                  trailing: ui.iconButton(
                                     icon: const Icon(Icons.delete),
                                     onPressed: () {
                                       setState(() {
@@ -859,10 +853,9 @@ class _TaskFormScreenState extends State<TaskFormScreen>
                   Row(
                     children: [
                       Expanded(
-                        child: ui.button(
+                        child: ui.outlinedButton(
                           label: 'Cancel',
                           onPressed: () => Navigator.pop(context),
-                          variant: ButtonVariant.secondary,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1161,6 +1154,7 @@ class _ReminderDialogState extends State<_ReminderDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ui = getAdaptiveFactory(context);
 
     return AlertDialog(
       title: const Text('Add Reminder'),
@@ -1249,11 +1243,12 @@ class _ReminderDialogState extends State<_ReminderDialog> {
         ],
       ),
       actions: [
-        TextButton(
+        ui.textButton(
+          label: 'Cancel',
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
         ),
-        FilledButton(
+        ui.button(
+          label: 'Add',
           onPressed: () {
             final reminderTime = widget.dueDate.subtract(
               Duration(days: _daysBefore, hours: _hoursBefore),
@@ -1268,7 +1263,6 @@ class _ReminderDialogState extends State<_ReminderDialog> {
             widget.onAdd(reminder);
             Navigator.pop(context);
           },
-          child: const Text('Add'),
         ),
       ],
     );

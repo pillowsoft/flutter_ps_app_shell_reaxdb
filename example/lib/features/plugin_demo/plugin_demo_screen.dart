@@ -33,47 +33,12 @@ class _PluginDemoScreenState extends State<PluginDemoScreen> {
   void _showMessage(String message) {
     if (!mounted) return;
 
-    final settingsStore = getIt<AppShellSettingsStore>();
-    final uiSystem = settingsStore.uiSystem.value;
-
-    if (uiSystem == 'cupertino') {
-      // For Cupertino, show a dialog instead of snackbar
-      showCupertinoDialog(
-        context: context,
-        builder: (context) => CupertinoAlertDialog(
-          title: const Text('Info'),
-          content: Text(message),
-          actions: [
-            CupertinoDialogAction(
-              child: const Text('OK'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      );
-    } else {
-      // For Material and ForUI, use ScaffoldMessenger if available
-      try {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-      } catch (e) {
-        // Fallback to dialog if ScaffoldMessenger is not available
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Info'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        );
-      }
-    }
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      message,
+      duration: const Duration(seconds: 3),
+    );
   }
 
   @override

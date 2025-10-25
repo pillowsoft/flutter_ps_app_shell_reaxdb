@@ -99,7 +99,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                     IconButton(
-                      onPressed: _isRefreshing ? null : _refreshData,
                       icon: _isRefreshing
                           ? const SizedBox(
                               width: 20,
@@ -107,6 +106,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.refresh),
+                      onPressed: _refreshData,
                       tooltip: 'Refresh Data',
                     ),
                   ],
@@ -612,11 +612,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _showComingSoonSnackBar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Coming soon! This feature is in development.'),
-        duration: Duration(seconds: 2),
-      ),
+    final ui = getAdaptiveFactory(context);
+    ui.showSnackBar(
+      context,
+      'Coming soon! This feature is in development.',
+      duration: const Duration(seconds: 2),
     );
   }
 }
