@@ -149,20 +149,51 @@ class DatabaseService {
   /// This prevents WAL accumulation during development (hot restarts, Ctrl+C exits)
   Future<void> _cleanupWalFiles(String dbPath, int maxSizeMB) async {
     try {
-      final dir = Directory(dbPath).parent;
       final dbName = Directory(dbPath).path.split('/').last;
+      final walFiles = <File>[];
 
-      // Look for WAL files (ReaxDB/SQLite pattern: dbname-wal, dbname-shm)
-      final walFiles = dir
-          .listSync()
-          .where((entity) =>
-              entity is File &&
-              (entity.path.endsWith('-wal') ||
-                  entity.path.endsWith('-shm') ||
-                  entity.path.contains('$dbName') &&
-                      entity.path.contains('wal')))
-          .cast<File>()
-          .toList();
+      // ReaxDB stores WAL files in a wal/ subdirectory with pattern wal_*.wal
+      final walDir = Directory('$dbPath/wal');
+      if (walDir.existsSync()) {
+        _logger.fine('Checking WAL directory: ${walDir.path}');
+        final reaxdbWalFiles = walDir
+            .listSync()
+            .where((entity) =>
+                entity is File &&
+                entity.path.endsWith('.wal') &&
+                entity.path.contains('wal_'))
+            .cast<File>()
+            .toList();
+        walFiles.addAll(reaxdbWalFiles);
+        _logger.fine(
+          'Found ${reaxdbWalFiles.length} ReaxDB WAL file(s) in ${walDir.path}',
+        );
+      } else {
+        _logger.fine('WAL directory does not exist: ${walDir.path}');
+      }
+
+      // Also check for SQLite-style WAL files in parent directory (fallback)
+      final parentDir = Directory(dbPath).parent;
+      if (parentDir.existsSync()) {
+        _logger.fine('Checking parent directory for SQLite-style WAL files: ${parentDir.path}');
+        final sqliteWalFiles = parentDir
+            .listSync()
+            .where((entity) =>
+                entity is File &&
+                (entity.path.endsWith('-wal') ||
+                    entity.path.endsWith('-shm') ||
+                    (entity.path.contains(dbName) &&
+                        entity.path.contains('wal') &&
+                        !entity.path.contains('/wal/'))))
+            .cast<File>()
+            .toList();
+        walFiles.addAll(sqliteWalFiles);
+        if (sqliteWalFiles.isNotEmpty) {
+          _logger.fine(
+            'Found ${sqliteWalFiles.length} SQLite-style WAL file(s) in ${parentDir.path}',
+          );
+        }
+      }
 
       if (walFiles.isEmpty) {
         _logger.fine('No WAL files found to clean up');
@@ -193,9 +224,11 @@ class DatabaseService {
       }
 
       // Delete WAL files (safe when database is not open)
+      int deletedCount = 0;
       for (final file in walFiles) {
         try {
           file.deleteSync();
+          deletedCount++;
           _logger.fine('Deleted WAL file: ${file.path}');
         } catch (e) {
           _logger.warning('Failed to delete WAL file ${file.path}: $e');
@@ -203,7 +236,9 @@ class DatabaseService {
       }
 
       _lastCleanupTime = DateTime.now();
-      _logger.info('WAL cleanup completed: removed ${walFiles.length} file(s)');
+      _logger.info(
+        'WAL cleanup completed: removed $deletedCount of ${walFiles.length} file(s)',
+      );
     } catch (e, stackTrace) {
       _logger.warning('Error during WAL cleanup', e, stackTrace);
       // Don't rethrow - WAL cleanup failure shouldn't prevent DB initialization

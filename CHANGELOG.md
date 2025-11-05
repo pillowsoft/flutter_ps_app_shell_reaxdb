@@ -5,6 +5,18 @@ All notable changes to the Flutter PS App Shell project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2024-11-05
+
+### Fixed
+
+#### WAL Auto-Cleanup Bug
+- **Fixed WAL cleanup location** - Now correctly checks `{dbPath}/wal/` subdirectory for ReaxDB WAL files (`wal_*.wal` pattern)
+- **Enhanced WAL file detection** - Added proper detection for ReaxDB-style WAL files in `wal/` subdirectory
+- **Improved logging** - Added detailed logging to show which directories are being checked and how many files were found
+- **Backward compatibility** - Still checks for SQLite-style WAL files (`-wal`, `-shm`) in parent directory as fallback
+
+This fixes the issue where `REAXDB_WAL_AUTO_CLEANUP=true` was not working because the cleanup code was looking in the wrong directory. WAL files were accumulating in `~/Documents/app_shell/wal/` but the cleanup was only checking the parent directory.
+
 ## [2.1.0] - 2025-10-23
 
 ### Added
